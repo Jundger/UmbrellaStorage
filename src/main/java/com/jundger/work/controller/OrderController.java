@@ -1,7 +1,6 @@
 package com.jundger.work.controller;
 
 import com.jundger.common.util.CreateRandomCharacter;
-import com.jundger.common.util.ToMap;
 import com.jundger.work.constant.Consts;
 import com.jundger.work.constant.OrderStatusEnum;
 import com.jundger.work.pojo.Cell;
@@ -126,8 +125,9 @@ public class OrderController {
 	 */
 	@ResponseBody
 	@RequestMapping(value = "start", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
-	public String startOrder(@RequestParam(value = "terminal_id") Integer terminal_id,
+	public Map<String, Object> startOrder(@RequestParam(value = "terminal_id") Integer terminal_id,
 									 @RequestParam(value = "qrcode") String qrcode) {
+		logger.info("====================订单开始接口调用=======================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
@@ -147,7 +147,7 @@ public class OrderController {
 		if (!OrderStatusEnum.WAITING.toString().equals(storage.getOrderStatus())) {
 			returnMsg.put("code", "0");
 			returnMsg.put("msg", storage.getOrderStatus());
-			return ToMap.MapToJson(returnMsg);
+			return returnMsg;
 		}
 
 		// 订单开始，改变订单和储物格状态，关闭对应超时的定时任务调度
@@ -164,7 +164,7 @@ public class OrderController {
 		returnMsg.put("cell_id", storage.getCellId());
 		returnMsg.put("type", type);
 
-		return ToMap.MapToJson(returnMsg);
+		return returnMsg;
 	}
 
 	/**
@@ -175,6 +175,8 @@ public class OrderController {
 	@ResponseBody
 	@RequestMapping(value = "finish", method = RequestMethod.POST)
 	public Map<String, Object> finishOrder(@RequestParam(value = "order_no") String order_no) {
+
+		logger.info("====================订单结束接口调用=====================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
@@ -203,6 +205,7 @@ public class OrderController {
 	@ResponseBody
 	@RequestMapping(value = "query", method = RequestMethod.POST)
 	public Map<String, Object> queryOrder(@RequestParam(value = "openid") String openid) {
+		logger.info("====================查询订单接口调用=====================");
 
 		logger.info("Query order by : " + openid);
 
