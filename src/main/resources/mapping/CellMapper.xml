@@ -160,8 +160,8 @@
         where id = #{id,jdbcType=INTEGER}
     </update>
 
-    <select id="selectAvailableCell" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    <select id="selectAvailableCell" resultMap="BaseResultMap">
         SELECT *
-        FROM `cell` WHERE terminal_id = terminal_id AND `status` = 'SPARE' AND type = 'STORAGE' AND book_flag = 0 LIMIT 1
+        FROM `cell` WHERE terminal_id = terminal_id AND `status` = 'AVAILABLE' AND type = #{type,jdbcType=VARCHAR} AND book_flag = 0 LIMIT 1
     </select>
 </mapper>

@@ -2,18 +2,18 @@ package com.jundger.work.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.jundger.common.util.ToMap;
+import com.jundger.work.pojo.Terminal;
 import com.jundger.work.pojo.User;
 import com.jundger.work.service.UserService;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,13 +26,50 @@ import java.util.Map;
  */
 
 @Controller
-@RequestMapping(value = "test")
-public class TestController {
+@RequestMapping(value = "terminal")
+public class TerminalController {
 
 	@Resource
 	private UserService userService;
 
-	private static Logger logger = Logger.getLogger(TestController.class);
+	private static Logger logger = Logger.getLogger(TerminalController.class);
+
+	/**
+	 * 根据地理位置获取附近设备列表
+	 * @param longitude 经度
+	 * @param latitude 纬度
+	 * @return 一定距离内的设备集合
+	 */
+	@ResponseBody
+	@RequestMapping(value = "getNearbyList", produces = "application/json; charset=utf-8")
+	public String getNearbyList(@RequestParam(value = "longitude") String longitude, @RequestParam(value = "latitude") String latitude) {
+
+		return null;
+	}
+
+	/**
+	 * 获取设备列表
+	 * @return 所有设备信息
+	 */
+	@ResponseBody
+	@RequestMapping(value = "getlist")
+	public Map<String, Object> getTerminalList() {
+		logger.info("==================获取设备列表接口调用===================");
+
+		Map<String, Object> returnMsg = new HashMap<String, Object>();
+
+		List<Terminal> list = userService.getTerminalList();
+		if (null != list && !list.isEmpty()) {
+			returnMsg.put("code", "1");
+			returnMsg.put("msg", "SUCCESS");
+			returnMsg.put("data", list);
+		} else {
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", "FAIL");
+		}
+
+		return returnMsg;
+	}
 
 	@ResponseBody
 	@RequestMapping(value = "{id}/showUsers", produces = "application/json; charset=utf-8")

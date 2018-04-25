@@ -1,6 +1,7 @@
 package com.jundger.work.dao;
 
 import com.jundger.work.pojo.Cell;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -53,5 +54,5 @@ public interface CellMapper {
      */
     int updateByPrimaryKey(Cell record);
 
-    Cell selectAvailableCell(Integer terminal_id);
+    Cell selectAvailableCell(@Param("terminal_id") Integer terminal_id, @Param("type") String type);
 }

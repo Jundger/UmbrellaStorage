@@ -19,7 +19,7 @@ public enum OrderStatusEnum {
 	// 用户已从目标终端使用服务（申请服务时长内）
 	RUNNING,
 
-	// 超过申请时长后未取走
+	// 超过申请时长后未取走/还回
 	EXPIRE,
 
 	// 服务正常结束

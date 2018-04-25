@@ -1,9 +1,7 @@
 package com.jundger.work.controller;
 
-import com.alibaba.fastjson.JSON;
 import com.jundger.common.util.CreateRandomCharacter;
 import com.jundger.common.util.ToMap;
-import com.jundger.work.constant.CellStatusEnum;
 import com.jundger.work.constant.Consts;
 import com.jundger.work.constant.OrderStatusEnum;
 import com.jundger.work.pojo.Cell;
@@ -13,17 +11,12 @@ import com.jundger.work.quartz.QuartzUtil;
 import com.jundger.work.service.UserService;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import javax.persistence.criteria.Order;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,52 +28,33 @@ import java.util.Map;
  * @version 1.0
  */
 @Controller
-@RequestMapping(value = "mini")
-public class MiniController {
+@RequestMapping(value = "order")
+public class OrderController {
 
 	@Resource
 	private UserService userService;
 
-	QuartzUtil quartzUtil = new QuartzUtil();
+	private QuartzUtil quartzUtil = new QuartzUtil();
 
-	private static Logger logger = Logger.getLogger(MiniController.class);
-
-	/**
-	 * 获取附近设备列表
-	 * @param openid 微信身份id
-	 * @param longitude 经度
-	 * @param latitude 纬度
-	 * @return 设备集合
-	 */
-	@ResponseBody
-	@RequestMapping(value = "getTerminalList", produces = "application/json; charset=utf-8")
-	public String getTerminalList(HttpServletRequest request, HttpServletResponse response,
-								  @RequestParam(value = "openid") String openid,
-								  @RequestParam(value = "longitude") String longitude,
-								  @RequestParam(value = "latitude") String latitude) {
-		return null;
-	}
-
+	private static Logger logger = Logger.getLogger(OrderController.class);
 
 	/**
-	 * 雨伞存储服务
+	 * 创建订单
 	 * @param openid 微信身份id
 	 * @param terminal_id 储伞柜终端id
 	 * @param duration 存储时长
-	 * @param type 类型：存/还
-	 * @return
+	 * @return 返回预创建的订单信息
 	 */
 	@ResponseBody
-	@RequestMapping(value = "wxstor", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
-	public String wxStorageUmbrella(HttpServletRequest request, HttpServletResponse response,
-								  @RequestParam(value = "openid") String openid,
-								  @RequestParam(value = "terminal_id") Integer terminal_id,
-								  @RequestParam(value = "duration") Integer duration,
-								  @RequestParam(value = "type") String type) {
+	@RequestMapping(value = "create", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
+	public Map<String, Object> createOrder(@RequestParam(value = "openid") String openid,
+												 @RequestParam(value = "terminal_id") Integer terminal_id,
+												 @RequestParam(value = "duration") Integer duration,
+												 @RequestParam(value = "type", required = false, defaultValue = Consts.TYPE_OF_STORAGE) String type) {
 
 		User user;
 		Storage storage;
-		logger.info("coming................");
+		logger.info("====================创建订单接口调用=====================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
@@ -90,16 +64,21 @@ public class MiniController {
 		if (storage == null) {
 			String order_no = CreateRandomCharacter.getOrderno();
 
-			Cell cell = userService.getAvailableCell(terminal_id);
+			if (!Consts.TYPE_OF_STORAGE.equals(type) && !Consts.TYPE_OF_BORROW.equals(type)) {
+				returnMsg.put("code", "0");
+				returnMsg.put("msg", "PARAM_TYPE_ERROR");
+				return returnMsg;
+			}
+			Cell cell = userService.getAvailableCell(terminal_id, type);
 			if (cell == null) {
 				logger.info(new Date() + "：该终端已没有可用空间！");
-				returnMsg.put("return_code", "2");
-				returnMsg.put("msg", "NONE_AVAILABLE");
-				return ToMap.MapToJson(returnMsg);
+				returnMsg.put("code", "0");
+				returnMsg.put("msg", "NONE_AVAILABLE_SPACE");
+				return returnMsg;
 			}
 			// 使储伞格处于预订状态
 			cell.setBookFlag(Consts.CELL_BOOK_FLAG_ON);
-			logger.info(JSON.toJSONStringWithDateFormat(cell, "yyyy-MM-dd HH:mm:ss"));
+//			logger.info(JSON.toJSONStringWithDateFormat(cell, "yyyy-MM-dd HH:mm:ss"));
 			cell.setUseCount(cell.getUseCount() + 1);
 			userService.updateCellStatus(cell);
 
@@ -111,11 +90,12 @@ public class MiniController {
 			storage.setCellId(cell.getId());
 			storage.setOrderStatus(OrderStatusEnum.WAITING.toString());
 			storage.setUserId(user.getId());
+			storage.setDetail(type);
 			String keyt = CreateRandomCharacter.getRandomString(Consts.KEY_LENGTH);
 			storage.setKeyt(keyt);
 			userService.addStorageOrder(storage); // 新增订单
 
-			returnMsg.put("return_code", "1");
+			returnMsg.put("code", "1");
 			returnMsg.put("user_id", user.getId());
 			returnMsg.put("username", user.getNickname());
 			returnMsg.put("order_no", order_no);
@@ -129,24 +109,35 @@ public class MiniController {
 			// 新增订单成功，设置一个超时时间，超过一定时长未进行服务则终止订单
 			quartzUtil.createOvertimeQuartz(quartzUtil.getNewOvertimeJobName(), quartzUtil.getNewOvertimeTriggerName(), order_no, Consts.ORDER_OVERTIME_TIME);
 		} else {
-			returnMsg.put("return_code", "0");
-			returnMsg.put("msg", "该用户尚有未完成的订单");
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", "EXIST_UNFINISHED_ORDER");
 		}
 
-		return ToMap.MapToJson(returnMsg);
+		return returnMsg;
 	}
 
+	/**
+	 * 订单开始
+	 * 用户在微信端预创建订单后到终端设备开始使用服务
+	 * 由终端设备调用此接口时正式开始服务计时
+	 * @param terminal_id 终端机器号
+	 * @param qrcode 终端扫描二维码所得到的数据
+	 * @return 操作结果
+	 */
 	@ResponseBody
-	@RequestMapping(value = "terstor", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
-	public String terStorageUmbrella(HttpServletRequest request, HttpServletResponse response,
-								 @RequestParam(value = "terminal_id") Integer terminal_id,
-								 @RequestParam(value = "qrcode") String qrcode) {
+	@RequestMapping(value = "start", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
+	public String startOrder(@RequestParam(value = "terminal_id") Integer terminal_id,
+									 @RequestParam(value = "qrcode") String qrcode) {
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
-		// 解析二维码数据
+		/**
+		 * 解析二维码数据
+		 * 格式：订单号.密钥.操作类型
+		 * 例：20180418020056725.IhSgjzxLQcRh58Pr3hcmUeSylZTt8IY6.STORAGE
+		 */
 		String[] part = new String[3];
-		part = qrcode.split("\\.");
+		part = qrcode.split("\\."); // 分隔符为. | 等字符时需要进行转义
 		String order_no = part[0];
 		String keyt = part[1];
 		String type = part[2].trim();
@@ -154,7 +145,7 @@ public class MiniController {
 		// 将二维码中的数据与数据库中的相应信息进行比对，判断二维码的正确性
 		Storage storage = userService.getOrderForCheck(order_no, keyt, terminal_id);
 		if (!OrderStatusEnum.WAITING.toString().equals(storage.getOrderStatus())) {
-			returnMsg.put("return_code", "0");
+			returnMsg.put("code", "0");
 			returnMsg.put("msg", storage.getOrderStatus());
 			return ToMap.MapToJson(returnMsg);
 		}
@@ -176,20 +167,57 @@ public class MiniController {
 		return ToMap.MapToJson(returnMsg);
 	}
 
-//	public static void main(String[] args) {
-//		QuartzUtil quartzUtil = new QuartzUtil();
-//
-//
-//		quartzUtil.createExpireQuartz(quartzUtil.getNewExpireJobName(), quartzUtil.getNewExpireTriggerName(), "aaaaa", 1000L);
-//
-//		quartzUtil.createExpireQuartz(quartzUtil.getNewExpireJobName(), quartzUtil.getNewExpireTriggerName(), "bbbbb", 5 * 1000L);
-//
-//		quartzUtil.createExpireQuartz(quartzUtil.getNewExpireJobName(), quartzUtil.getNewExpireTriggerName(), "ccccc", 8 * 1000L);
-//
-//		quartzUtil.createOvertimeQuartz(quartzUtil.getNewOvertimeJobName(), quartzUtil.getNewOvertimeTriggerName(), "00001", 2 * 1000L);
-//
-//		quartzUtil.createOvertimeQuartz(quartzUtil.getNewOvertimeJobName(), quartzUtil.getNewOvertimeTriggerName(), "00002", 15 * 1000L);
-//
-//		quartzUtil.createOvertimeQuartz(quartzUtil.getNewOvertimeJobName(), quartzUtil.getNewOvertimeTriggerName(), "00003", 18 * 1000L);
-//	}
+	/**
+	 * 用户在规定时间内从终端设备正常完成订单
+	 * @param order_no 订单号
+	 * @return 操作结果
+	 */
+	@ResponseBody
+	@RequestMapping(value = "finish", method = RequestMethod.POST)
+	public Map<String, Object> finishOrder(@RequestParam(value = "order_no") String order_no) {
+
+		Map<String, Object> returnMsg = new HashMap<String, Object>();
+
+		// 查找到对应订单将状态RUNNING改为FINISH,并将cell表中book_flag置0，status改为AVAILABLE
+		try {
+			if (userService.finishOrder(order_no) == 1) {
+				returnMsg.put("code", "1");
+				returnMsg.put("msg", "FINISH_ORDER_SUCCESS");
+			} else {
+				returnMsg.put("code", "0");
+				returnMsg.put("msg", "ORDER_ABNORMAL");
+			}
+		} catch (Exception e) {
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", "UNKNOWN_ERROR");
+		}
+
+		return returnMsg;
+	}
+
+	/**
+	 * 查询订单
+	 * @param openid 微信号
+	 * @return 查询结果
+	 */
+	@ResponseBody
+	@RequestMapping(value = "query", method = RequestMethod.POST)
+	public Map<String, Object> queryOrder(@RequestParam(value = "openid") String openid) {
+
+		logger.info("Query order by : " + openid);
+
+		Map<String, Object> returnMsg = new HashMap<String, Object>();
+
+		List<Storage> storages = userService.queryOrder(openid);
+		if (null != storages && !storages.isEmpty()) {
+			returnMsg.put("code", "1");
+			returnMsg.put("msg", "QUERY_SUCCESS");
+			returnMsg.put("data", storages);
+		} else {
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", "QUERY_FAIL");
+		}
+
+		return returnMsg;
+	}
 }

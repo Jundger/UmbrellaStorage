@@ -11,11 +11,11 @@ package com.jundger.work.constant;
 public enum CellStatusEnum {
 
 	// 空闲状态
-	SPARE,
+	AVAILABLE,
 
 	// 使用中
 	USING,
 
-	// 超期未取走
+	// 超期
 	EXPIRE
 }

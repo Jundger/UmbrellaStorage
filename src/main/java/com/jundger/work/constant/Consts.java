@@ -10,7 +10,10 @@ package com.jundger.work.constant;
  */
 public class Consts {
 
-	public static final Integer KEY_LENGTH = 32;
+	public static final Integer KEY_LENGTH = 16;
+
+	public static final String TYPE_OF_STORAGE = "STORAGE";
+	public static final String TYPE_OF_BORROW = "BORROW";
 
 	// 订单超时时间
 	public static final Integer ORDER_OVERTIME_TIME = 2;

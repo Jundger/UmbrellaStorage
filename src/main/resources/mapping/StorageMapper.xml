@@ -267,4 +267,27 @@
     SET order_status = "RUNNING", begin_time = now(), cell.status = "USING", book_flag = 1
     WHERE storage_service.cell_id = cell.id AND storage_service.order_no = #{order_no,jdbcType=VARCHAR};
   </update>
+
+  <select id="selectByOpenId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    SELECT
+    storage_service.id,
+    storage_service.order_no,
+    storage_service.purchase_duration,
+    storage_service.create_time,
+    storage_service.keyt,
+    storage_service.begin_time,
+    storage_service.end_time,
+    storage_service.final_duration,
+    storage_service.terminal_id,
+    storage_service.cell_id,
+    storage_service.order_status,
+    storage_service.pay_status,
+    storage_service.user_id,
+    storage_service.detail
+    FROM
+    storage_service
+    INNER JOIN `user` ON storage_service.user_id = `user`.id
+    WHERE
+    user.open_id = #{openid,jdbcType=VARCHAR}
+  </select>
 </mapper>

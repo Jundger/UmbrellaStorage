@@ -2,7 +2,10 @@ package com.jundger.work.service;
 
 import com.jundger.work.pojo.Cell;
 import com.jundger.work.pojo.Storage;
+import com.jundger.work.pojo.Terminal;
 import com.jundger.work.pojo.User;
+
+import java.util.List;
 
 /**
  * Title: UmbrellaStorage
@@ -27,13 +30,13 @@ public interface UserService {
 	public Storage getRunningOrderById(int userId);
 
 	// 通过terminal_id查询储物格信息
-	public Cell getAvailableCell(Integer terminal_id);
+	public Cell getAvailableCell(Integer terminal_id, String type);
 
 	// 新增订单信息
 	public int addStorageOrder(Storage record);
 
 	// 更新储物格使用状态
-	public int updateCellStatus(Cell record);
+	public int 	updateCellStatus(Cell record);
 
 	// 超时后重置订单状态
 	public int overtimeReset(String order_no);
@@ -47,4 +50,12 @@ public interface UserService {
 	// 订单开始后重置一些状态
 	int updateBeginStatus(String order_no);
 
+	// 获取所有设备列表
+	List<Terminal> getTerminalList();
+
+	// 根据openid查询用户所有订单
+	List<Storage> queryOrder(String openid);
+
+	// 订单正常结束
+	int finishOrder(String order_no);
 }

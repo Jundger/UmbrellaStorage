@@ -4,17 +4,19 @@ import com.alibaba.fastjson.JSON;
 import com.jundger.work.constant.OrderStatusEnum;
 import com.jundger.work.dao.CellMapper;
 import com.jundger.work.dao.StorageMapper;
+import com.jundger.work.dao.TerminalMapper;
 import com.jundger.work.dao.UserMapper;
 import com.jundger.work.pojo.Cell;
 import com.jundger.work.pojo.Storage;
+import com.jundger.work.pojo.Terminal;
 import com.jundger.work.pojo.User;
 import com.jundger.work.quartz.OvertimeJob;
 import com.jundger.work.service.UserService;
 import org.apache.log4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 /**
  * Title: UmbrellaStorage
@@ -36,6 +38,9 @@ public class UserServiceImpl implements UserService {
 	@Resource
 	private CellMapper cellMapper;
 
+	@Resource
+	private TerminalMapper terminalMapper;
+
 	private static Logger logger = Logger.getLogger(OvertimeJob.class);
 
 	// 通过ID查询用户信息
@@ -56,8 +61,8 @@ public class UserServiceImpl implements UserService {
 		return this.storageMapper.selectRunningOrderByUserId(userId);
 	}
 
-	public Cell getAvailableCell(Integer terminal_id) {
-		return this.cellMapper.selectAvailableCell(terminal_id);
+	public Cell getAvailableCell(Integer terminal_id, String type) {
+		return this.cellMapper.selectAvailableCell(terminal_id, type);
 	}
 
 	public int addStorageOrder(Storage record) {
@@ -101,6 +106,29 @@ public class UserServiceImpl implements UserService {
 
 	public int updateBeginStatus(String order_no) {
 		return storageMapper.updateBeginStatus(order_no);
+	}
+
+	public List<Terminal> getTerminalList() {
+		return terminalMapper.selectAll();
+	}
+
+	public List<Storage> queryOrder(String openid) {
+		return storageMapper.selectByOpenId(openid);
+	}
+
+	public int finishOrder(String order_no) {
+
+		Storage storage = storageMapper.selectByOrderNo(order_no);
+		if (OrderStatusEnum.RUNNING.toString().equals(storage.getOrderStatus())) {
+			// 更新storage表
+			storage.setOrderStatus(OrderStatusEnum.FINISH.toString());
+			storageMapper.updateByPrimaryKeySelective(storage);
+
+			// 此情况下数据库中的触发器会自动更新cell表状态
+
+			return 1;
+		}
+		return 0;
 	}
 
 }
