@@ -13,6 +13,9 @@ public enum OrderStatusEnum {
 	// 创建订单成功后，等待用户使用服务
 	WAITING,
 
+	// 创建订单后在超时前取消订单
+	CANCEL,
+
 	// 生成订单后未使用服务超过一定时间后终止订单
 	OVERTIME,
 

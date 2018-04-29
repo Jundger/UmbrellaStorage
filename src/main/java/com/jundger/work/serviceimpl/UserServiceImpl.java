@@ -16,7 +16,9 @@ import org.apache.log4j.Logger;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Title: UmbrellaStorage
@@ -51,6 +53,10 @@ public class UserServiceImpl implements UserService {
 
 	public User getUserByOpenId(String openid) {
 		return this.userDao.selectByOpenId(openid);
+	}
+
+	public int addUserSelective(User record) {
+		return userDao.insertSelective(record);
 	}
 
 	public Storage getAllOrderById(int userId) {
@@ -108,27 +114,48 @@ public class UserServiceImpl implements UserService {
 		return storageMapper.updateBeginStatus(order_no);
 	}
 
-	public List<Terminal> getTerminalList() {
-		return terminalMapper.selectAll();
+	public List<Map<String, Object>> getTerminalList(Float longitude, Float latitude, Double radius) {
+		return terminalMapper.selectNear(longitude, latitude, radius);
 	}
 
 	public List<Storage> queryOrder(String openid) {
 		return storageMapper.selectByOpenId(openid);
 	}
 
-	public int finishOrder(String order_no) {
+	public String cancelOrder(String order_no) {
 
 		Storage storage = storageMapper.selectByOrderNo(order_no);
-		if (OrderStatusEnum.RUNNING.toString().equals(storage.getOrderStatus())) {
+		if (storage == null) {
+			return "ORDER_NOT_EXIST";
+		} else if (OrderStatusEnum.OVERTIME.toString().equals(storage.getOrderStatus())) {
+			return "ORDER_OVERTIME";
+		} else if (OrderStatusEnum.WAITING.toString().equals(storage.getOrderStatus())) {
+			storage.setOrderStatus(OrderStatusEnum.CANCEL.toString());
+			storageMapper.updateByPrimaryKeySelective(storage);
+			return "CANCEL_ORDER_SUCCESS";
+		}
+		return "ORDER_STATUS_ABNORMAL";
+	}
+
+	public String finishOrder(Storage storage) {
+
+		if (OrderStatusEnum.OVERTIME.toString().equals(storage.getOrderStatus())) {
+			return "2"; // ORDER_OVERTIME
+		} else if (OrderStatusEnum.RUNNING.toString().equals(storage.getOrderStatus())) {
+
 			// 更新storage表
+			Date nowTime = new Date();
+			storage.setEndTime(nowTime);
+			storage.setFinalDuration(new Long((nowTime.getTime() - storage.getBeginTime().getTime()) / (1000 * 60)).intValue());
 			storage.setOrderStatus(OrderStatusEnum.FINISH.toString());
 			storageMapper.updateByPrimaryKeySelective(storage);
 
 			// 此情况下数据库中的触发器会自动更新cell表状态
 
-			return 1;
+			return "1"; // FINISH_ORDER_SUCCESS
 		}
-		return 0;
+
+		return "3"; // ORDER_STATUS_ABNORMAL
 	}
 
 }

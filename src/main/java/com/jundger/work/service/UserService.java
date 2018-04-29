@@ -6,6 +6,7 @@ import com.jundger.work.pojo.Terminal;
 import com.jundger.work.pojo.User;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Title: UmbrellaStorage
@@ -18,44 +19,50 @@ import java.util.List;
 public interface UserService {
 
 	// 通过ID查询用户信息
-	public User getUserById(int userId);
+	User getUserById(int userId);
 
 	// 通过openid查询用户信息
-	public User getUserByOpenId(String openid);
+	User getUserByOpenId(String openid);
+
+	// 插入用户信息
+	int addUserSelective(User record);
 
 	// 通过id查询用户订单
-	public Storage getAllOrderById(int userId);
+	Storage getAllOrderById(int userId);
 
 	// 通过id查询用户未完成的订单
-	public Storage getRunningOrderById(int userId);
+	Storage getRunningOrderById(int userId);
 
 	// 通过terminal_id查询储物格信息
-	public Cell getAvailableCell(Integer terminal_id, String type);
+	Cell getAvailableCell(Integer terminal_id, String type);
 
 	// 新增订单信息
-	public int addStorageOrder(Storage record);
+	int addStorageOrder(Storage record);
 
 	// 更新储物格使用状态
-	public int 	updateCellStatus(Cell record);
+	int 	updateCellStatus(Cell record);
 
 	// 超时后重置订单状态
-	public int overtimeReset(String order_no);
+	int overtimeReset(String order_no);
 
 	// 到期后重置订单状态
-	public int expireReset(String order_no);
+	int expireReset(String order_no);
 
 	// 检验从终端设备传递来的数据正确性
-	public Storage getOrderForCheck(String order_no, String keyt, Integer terminal_id);
+	Storage getOrderForCheck(String order_no, String keyt, Integer terminal_id);
 
 	// 订单开始后重置一些状态
 	int updateBeginStatus(String order_no);
 
-	// 获取所有设备列表
-	List<Terminal> getTerminalList();
+	// 获取一定范围内的设备列表
+	List<Map<String, Object>> getTerminalList(Float longitude, Float latitude, Double radius);
 
 	// 根据openid查询用户所有订单
 	List<Storage> queryOrder(String openid);
 
+	// 取消订单
+	String cancelOrder(String order_no);
+
 	// 订单正常结束
-	int finishOrder(String order_no);
+	String finishOrder(Storage storage);
 }

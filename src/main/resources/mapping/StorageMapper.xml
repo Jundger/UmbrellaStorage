@@ -236,7 +236,7 @@
   </select>
 
   <select id="selectRunningOrderByUserId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-    SELECT * FROM storage_service WHERE user_id = #{id,jdbcType=INTEGER} AND order_status = 'WAITING' OR order_status = 'RUNNING'
+    SELECT * FROM storage_service WHERE user_id = #{id,jdbcType=INTEGER} AND (order_status = 'WAITING' OR order_status = 'RUNNING')
   </select>
 
   <select id="selectByOrderNo" parameterType="java.lang.String" resultMap="BaseResultMap">

@@ -1,5 +1,6 @@
 package com.jundger.work.controller;
 
+import com.alibaba.fastjson.JSON;
 import com.jundger.common.util.CreateRandomCharacter;
 import com.jundger.work.constant.Consts;
 import com.jundger.work.constant.OrderStatusEnum;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -46,10 +48,10 @@ public class OrderController {
 	 */
 	@ResponseBody
 	@RequestMapping(value = "create", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
-	public Map<String, Object> createOrder(@RequestParam(value = "openid") String openid,
-												 @RequestParam(value = "terminal_id") Integer terminal_id,
-												 @RequestParam(value = "duration") Integer duration,
-												 @RequestParam(value = "type", required = false, defaultValue = Consts.TYPE_OF_STORAGE) String type) {
+	public Map<String, Object> createOrder(HttpServletRequest request, @RequestParam(value = "openid") String openid,
+										   @RequestParam(value = "terminal_id") Integer terminal_id,
+										   @RequestParam(value = "duration") Integer duration,
+										   @RequestParam(value = "types", required = false, defaultValue = Consts.TYPE_OF_STORAGE) String type) {
 
 		User user;
 		Storage storage;
@@ -59,6 +61,12 @@ public class OrderController {
 
 		// 根据openid查询用户是否已有正在进行的订单
 		user = userService.getUserByOpenId(openid);
+		if (user == null) {
+			user = new User();
+			user.setOpenId(openid);
+			user.setLoginIp(request.getRemoteAddr());
+			userService.addUserSelective(user);
+		}
 		storage = userService.getRunningOrderById(user.getId());
 		if (storage == null) {
 			String order_no = CreateRandomCharacter.getOrderno();
@@ -115,6 +123,32 @@ public class OrderController {
 		return returnMsg;
 	}
 
+	@ResponseBody
+	@RequestMapping(value = "/cancel", method = RequestMethod.POST)
+	public Map<String, Object> cancelOrder(@RequestParam(value = "order_no") String order_no) {
+
+		logger.info("====================订单取消接口调用=====================");
+
+		Map<String, Object> returnMsg = new HashMap<String, Object>();
+
+		try {
+			String result = userService.cancelOrder(order_no);
+			if ("CANCEL_ORDER_SUCCESS".equals(result)) {
+				returnMsg.put("code", "1");
+			}
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", result);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+
+			returnMsg.put("code", "0");
+			returnMsg.put("msg", "UNKNOWN_ERROR");
+		}
+
+		return returnMsg;
+	}
+
 	/**
 	 * 订单开始
 	 * 用户在微信端预创建订单后到终端设备开始使用服务
@@ -126,72 +160,106 @@ public class OrderController {
 	@ResponseBody
 	@RequestMapping(value = "start", method = RequestMethod.POST, produces = "application/json; charset=utf-8")
 	public Map<String, Object> startOrder(@RequestParam(value = "terminal_id") Integer terminal_id,
-									 @RequestParam(value = "qrcode") String qrcode) {
+										  @RequestParam(value = "qrcode") String qrcode) {
 		logger.info("====================订单开始接口调用=======================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
-		/**
-		 * 解析二维码数据
-		 * 格式：订单号.密钥.操作类型
-		 * 例：20180418020056725.IhSgjzxLQcRh58Pr3hcmUeSylZTt8IY6.STORAGE
-		 */
-		String[] part = new String[3];
-		part = qrcode.split("\\."); // 分隔符为. | 等字符时需要进行转义
-		String order_no = part[0];
-		String keyt = part[1];
-		String type = part[2].trim();
+		logger.info("qrcode-->" + qrcode);
 
-		// 将二维码中的数据与数据库中的相应信息进行比对，判断二维码的正确性
-		Storage storage = userService.getOrderForCheck(order_no, keyt, terminal_id);
-		if (!OrderStatusEnum.WAITING.toString().equals(storage.getOrderStatus())) {
-			returnMsg.put("code", "0");
-			returnMsg.put("msg", storage.getOrderStatus());
-			return returnMsg;
+		try {
+			/**
+			 * 解析二维码数据
+			 * 格式：订单号.密钥.操作类型
+			 * 例：20180418020056725.IhSgjzxLQcRh58Pr3hcmUeSylZTt8IY6.STORAGE
+			 */
+			String[] part = new String[3];
+			part = qrcode.split("\\."); // 分隔符为. | 等字符时需要进行转义
+			String order_no = part[0];
+			String keyt = part[1];
+			String type = part[2].trim();
+
+			// 将二维码中的数据与数据库中的相应信息进行比对，判断二维码的正确性
+			Storage storage = userService.getOrderForCheck(order_no, keyt, terminal_id);
+			if (null == storage) {
+				returnMsg.put("code", "0"); // PARAM_UNPAIRED
+				return returnMsg;
+			} else if (OrderStatusEnum.OVERTIME.toString().equals(storage.getOrderStatus())) {
+				returnMsg.put("code", "2");
+				return returnMsg;
+			} else if (OrderStatusEnum.RUNNING.toString().equals(storage.getOrderStatus())) {
+				returnMsg.put("code", "3");
+				return returnMsg;
+			} else if (OrderStatusEnum.EXPIRE.toString().equals(storage.getOrderStatus())) {
+				returnMsg.put("code", "4");
+				return returnMsg;
+			} else if (OrderStatusEnum.FINISH.toString().equals(storage.getOrderStatus())) {
+				returnMsg.put("code", "5");
+				return returnMsg;
+			}
+
+			// 订单开始，改变订单和储物格状态，关闭对应超时的定时任务调度
+			userService.updateBeginStatus(storage.getOrderNo());
+
+			// 计时开始，到期后终止订单
+			quartzUtil.createExpireQuartz(quartzUtil.getNewExpireJobName(), quartzUtil.getNewExpireTriggerName(), order_no, storage.getPurchaseDuration());
+
+			User user = userService.getUserById(storage.getUserId());
+			// 生成返回数据包，包括用户名、储物格id和存取类型等
+			returnMsg.put("code", "1");
+//			returnMsg.put("order_no", order_no);
+			returnMsg.put("cell_id", storage.getCellId());
+			returnMsg.put("type", type.equals("STORAGE") ? "0" : "1");
+		} catch (Exception e) {
+			e.printStackTrace();
+			returnMsg.put("code", "6");
 		}
-
-		// 订单开始，改变订单和储物格状态，关闭对应超时的定时任务调度
-		userService.updateBeginStatus(storage.getOrderNo());
-
-		// 计时开始，到期后终止订单
-		quartzUtil.createExpireQuartz(quartzUtil.getNewExpireJobName(), quartzUtil.getNewExpireTriggerName(), order_no, storage.getPurchaseDuration());
-
-		User user = userService.getUserById(storage.getUserId());
-		// 生成返回数据包，包括用户名、储物格id和存取类型等
-		returnMsg.put("return_code", "1");
-		returnMsg.put("msg", "TRANSACTION_SUCCESS");
-		returnMsg.put("nickname", user.getNickname());
-		returnMsg.put("cell_id", storage.getCellId());
-		returnMsg.put("type", type);
-
 		return returnMsg;
 	}
 
 	/**
 	 * 用户在规定时间内从终端设备正常完成订单
-	 * @param order_no 订单号
+	 * @param qrcode 终端扫描二维码所得到的数据
 	 * @return 操作结果
 	 */
 	@ResponseBody
 	@RequestMapping(value = "finish", method = RequestMethod.POST)
-	public Map<String, Object> finishOrder(@RequestParam(value = "order_no") String order_no) {
+	public Map<String, Object> finishOrder(@RequestParam(value = "terminal_id") Integer terminal_id,
+										   @RequestParam(value = "qrcode") String qrcode) {
 
 		logger.info("====================订单结束接口调用=====================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
-		// 查找到对应订单将状态RUNNING改为FINISH,并将cell表中book_flag置0，status改为AVAILABLE
+		logger.info("qrcode-->" + qrcode);
+
 		try {
-			if (userService.finishOrder(order_no) == 1) {
-				returnMsg.put("code", "1");
-				returnMsg.put("msg", "FINISH_ORDER_SUCCESS");
-			} else {
-				returnMsg.put("code", "0");
-				returnMsg.put("msg", "ORDER_ABNORMAL");
+			/**
+			 * 解析二维码数据
+			 * 格式：订单号.密钥.操作类型
+			 * 例：20180418020056725.IhSgjzxLQcRh58Pr3hcmUeSylZTt8IY6.STORAGE
+			 */
+			String[] part = new String[3];
+			part = qrcode.split("\\."); // 分隔符为. | 等字符时需要进行转义
+			String order_no = part[0];
+			String keyt = part[1];
+			String type = part[2].trim();
+
+
+			// 将二维码中的数据与数据库中的相应信息进行比对，判断二维码的正确性
+			Storage storage = userService.getOrderForCheck(order_no, keyt, terminal_id);
+			if (null == storage) {
+				returnMsg.put("code", "0"); // PARAM_UNPAIRED
+				return returnMsg;
 			}
+
+			// 查找到对应订单将状态RUNNING改为FINISH,并将cell表中book_flag置0，status改为AVAILABLE
+			String result = userService.finishOrder(storage);
+
+			returnMsg.put("code", result);
+
 		} catch (Exception e) {
-			returnMsg.put("code", "0");
-			returnMsg.put("msg", "UNKNOWN_ERROR");
+			returnMsg.put("code", "4"); // UNKNOWN_ERROR
 		}
 
 		return returnMsg;

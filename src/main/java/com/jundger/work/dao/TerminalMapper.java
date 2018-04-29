@@ -1,8 +1,10 @@
 package com.jundger.work.dao;
 
 import com.jundger.work.pojo.Terminal;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 public interface TerminalMapper {
     /**
@@ -54,4 +56,7 @@ public interface TerminalMapper {
     int updateByPrimaryKey(Terminal record);
 
     List<Terminal> selectAll();
+
+    List<Map<String, Object>> selectNear(@Param("longitude") Float longitude, @Param("latitude") Float latitude, @Param("radius") Double radius);
+
 }

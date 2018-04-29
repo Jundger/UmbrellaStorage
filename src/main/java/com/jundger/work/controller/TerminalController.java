@@ -2,6 +2,7 @@ package com.jundger.work.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.jundger.common.util.ToMap;
+import com.jundger.work.constant.Consts;
 import com.jundger.work.pojo.Terminal;
 import com.jundger.work.pojo.User;
 import com.jundger.work.service.UserService;
@@ -41,29 +42,29 @@ public class TerminalController {
 	 * @return 一定距离内的设备集合
 	 */
 	@ResponseBody
-	@RequestMapping(value = "getNearbyList", produces = "application/json; charset=utf-8")
-	public String getNearbyList(@RequestParam(value = "longitude") String longitude, @RequestParam(value = "latitude") String latitude) {
-
-		return null;
-	}
-
-	/**
-	 * 获取设备列表
-	 * @return 所有设备信息
-	 */
-	@ResponseBody
 	@RequestMapping(value = "getlist")
-	public Map<String, Object> getTerminalList() {
-		logger.info("==================获取设备列表接口调用===================");
+	public Map<String, Object> getTerminalList(@RequestParam(value = "longitude") Float longitude,
+											   @RequestParam(value = "latitude") Float latitude,
+											   @RequestParam(value = "radius", required = false, defaultValue = "10") Float radius) {
+
+		logger.info("=================获取附近设备列表接口调用==================");
 
 		Map<String, Object> returnMsg = new HashMap<String, Object>();
 
-		List<Terminal> list = userService.getTerminalList();
-		if (null != list && !list.isEmpty()) {
-			returnMsg.put("code", "1");
-			returnMsg.put("msg", "SUCCESS");
-			returnMsg.put("data", list);
-		} else {
+		try {
+			List<Map<String, Object>> list = userService.getTerminalList(longitude, latitude, radius.doubleValue());
+
+			if (list != null) {
+				logger.info("list size --> " + list.size());
+				returnMsg.put("code", "1");
+				returnMsg.put("msg", "SUCCESS");
+				returnMsg.put("data", list);
+			} else {
+				returnMsg.put("code", "0");
+				returnMsg.put("msg", "NULL");
+			}
+
+		} catch (Exception e) {
 			returnMsg.put("code", "0");
 			returnMsg.put("msg", "FAIL");
 		}
